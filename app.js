@@ -16,12 +16,14 @@ const elements = {
   crashTableBody: document.getElementById("crashTableBody"),
   queryLog: document.getElementById("queryLog"),
   crashMap: document.getElementById("crashMap"),
+  mapSeverityFilters: document.getElementById("mapSeverityFilters"),
 };
 
 let allRows = [];
 let dashboard = null;
 let crashMap = null;
 let markerLayer = null;
+let selectedMapSeverities = new Set(severityOrder);
 
 function setStatus(message, isError = false) {
   elements.statusText.textContent = message;
@@ -211,6 +213,43 @@ function initializeMap() {
   markerLayer = L.layerGroup().addTo(crashMap);
 }
 
+function renderMapSeverityFilters(severityCounts) {
+  if (!elements.mapSeverityFilters) return;
+
+  elements.mapSeverityFilters.innerHTML = "";
+
+  severityOrder.forEach((severity) => {
+    const button = document.createElement("button");
+    const count = severityCounts.get(severity) || 0;
+    const isActive = selectedMapSeverities.has(severity);
+
+    button.type = "button";
+    button.className = `severity-filter-chip ${isActive ? "severity-filter-chip--active" : ""}`;
+    button.textContent = `${severity} (${count})`;
+    button.setAttribute("aria-pressed", String(isActive));
+    button.dataset.severity = severity;
+
+    button.addEventListener("click", () => {
+      if (
+        selectedMapSeverities.has(severity) &&
+        selectedMapSeverities.size === 1
+      ) {
+        return;
+      }
+
+      if (selectedMapSeverities.has(severity)) {
+        selectedMapSeverities.delete(severity);
+      } else {
+        selectedMapSeverities.add(severity);
+      }
+
+      renderMap(renderTable(allRows));
+    });
+
+    elements.mapSeverityFilters.appendChild(button);
+  });
+}
+
 function renderMap(rows) {
   initializeMap();
 
@@ -220,6 +259,7 @@ function renderMap(rows) {
 
   const bounds = [];
   for (const row of rows) {
+    if (!selectedMapSeverities.has(row.severity)) continue;
     if (!Number.isFinite(row.lat) || !Number.isFinite(row.lon)) continue;
 
     const latLng = [row.lat, row.lon];
@@ -321,6 +361,7 @@ function renderDashboard(data) {
   elements.routeMetric.textContent = `${dashboard.topRoute.name} (${dashboard.topRoute.count})`;
 
   renderSeverityBars(dashboard.severityCounts, dashboard.records);
+  renderMapSeverityFilters(dashboard.severityCounts);
   renderMap(renderTable(allRows));
 
   elements.queryLog.textContent = JSON.stringify(data, null, 2);
