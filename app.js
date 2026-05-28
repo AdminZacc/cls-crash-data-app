@@ -27,7 +27,6 @@ let dashboard = null;
 let crashMap = null;
 let markerLayer = null;
 let selectedMapSeverities = new Set(severityOrder);
-let selectedMapSeverities = new Set(severityOrder);
 
 function setStatus(message, isError = false) {
   elements.statusText.textContent = message;
@@ -373,11 +372,20 @@ function renderMap(rows) {
 function renderTable(rows) {
   const filtered = getTableFilteredRows(rows);
   const query = elements.searchInput.value.trim();
+  const tableFiltersActive =
+    (elements.tableSeverityFilter &&
+      elements.tableSeverityFilter.value !== "All") ||
+    (elements.tableJurisdictionFilter &&
+      elements.tableJurisdictionFilter.value !== "All");
 
   if (elements.searchStatus) {
-    elements.searchStatus.textContent = query
-      ? `Showing ${filtered.length} of ${rows.length} records for "${query}"`
-      : `Showing all ${rows.length} records`;
+    if (query) {
+      elements.searchStatus.textContent = `Showing ${filtered.length} of ${rows.length} records for "${query}"`;
+    } else if (tableFiltersActive) {
+      elements.searchStatus.textContent = `Showing ${filtered.length} of ${rows.length} records`;
+    } else {
+      elements.searchStatus.textContent = `Showing all ${rows.length} records`;
+    }
   }
 
   elements.crashTableBody.innerHTML = "";
