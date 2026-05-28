@@ -11,6 +11,10 @@
     "/^python -m py_compile crash_ui\\.py crash_parser\\.py$/": {
       "approve": true,
       "matchCommandLine": true
+    },
+    "/^cd \"c:/Users/elliotze/OneDrive - Old Dominion University/Desktop/python/CLSCL-CrashDataParser\" && python -m pytest -q$/": {
+      "approve": true,
+      "matchCommandLine": true
     }
   }
 }

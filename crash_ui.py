@@ -2,6 +2,9 @@ import json
 import tkinter as tk
 from collections import Counter
 from datetime import datetime
+import tempfile
+import webbrowser
+from html import escape
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 from tkinter.scrolledtext import ScrolledText
@@ -26,6 +29,14 @@ AWS_CARD = "#ffffff"
 AWS_TEXT = "#1b2533"
 AWS_MUTED = "#5f6b7a"
 AWS_BORDER = "#d7dde5"
+MAP_SEVERITY_COLORS = {
+    "K": "#7f1d1d",
+    "A": "#b91c1c",
+    "B": "#d97706",
+    "C": "#0369a1",
+    "O": "#6b7280",
+    "Unknown": "#6b7280",
+}
 
 
 def _safe_float(value: object) -> float:
@@ -271,6 +282,9 @@ class CrashParserUI(tk.Tk):
         button_frame.pack(fill=tk.X, pady=(10, 0))
 
         tk.Button(button_frame, text="Run Query", command=self._run_query).pack(side=tk.LEFT)
+        tk.Button(button_frame, text="Open Map", command=self._open_map).pack(
+            side=tk.LEFT, padx=(8, 0)
+        )
         tk.Button(button_frame, text="Save JSON", command=self._save_json).pack(
             side=tk.LEFT, padx=(8, 0)
         )
@@ -439,7 +453,7 @@ class CrashParserUI(tk.Tk):
                 end_date=query_values["end_date"],
                 distance_miles=query_values["distance_miles"],
                 where_clause=query_values["where_clause"],
-                timeout=query_values["timeout"],
+                timeout=float(query_values["timeout"]),
             )
         except Exception as exc:
             messagebox.showerror("Error", str(exc))
@@ -482,6 +496,204 @@ class CrashParserUI(tk.Tk):
         self.output_text.delete("1.0", tk.END)
         self.last_summary = None
         self._clear_dashboard()
+
+        def _open_map(self) -> None:
+                if not self.last_summary:
+                        messagebox.showinfo("No Result", "Run a query first.")
+                        return
+
+                map_rows: list[dict[str, object]] = []
+            features = self.last_summary.get("geojson", {}).get("features", [])
+            for feature in features:
+                properties = feature.get("properties", {}) if isinstance(feature, dict) else {}
+                severity_value = str(properties.get("CRASH_SEVERITY") or "Unknown").strip().upper()
+                if severity_value not in SEVERITY_ORDER:
+                    severity_value = severity_value[:1] if severity_value else "Unknown"
+                if severity_value not in SEVERITY_ORDER:
+                    severity_value = "Unknown"
+
+                row = {
+                    "date": _format_crash_dt(properties.get("CRASH_DT")),
+                    "severity": severity_value,
+                    "injured": int(_safe_float(properties.get("PERSONS_INJURED"))),
+                    "killed": int(_safe_float(properties.get("K_PEOPLE"))),
+                    "route": str(properties.get("ROUTE_OR_STREET_NM") or "Unknown"),
+                    "jurisdiction": str(properties.get("PHYSICAL_JURIS") or "Unknown"),
+                    "lat": properties.get("LAT"),
+                    "lon": properties.get("LON"),
+                }
+
+                        # Filter out rows that cannot be placed on the map.
+                        lat = row.get("lat")
+                        lon = row.get("lon")
+                        if not isinstance(lat, (int, float)) or not isinstance(lon, (int, float)):
+                                continue
+                        map_rows.append(row)
+
+                if not map_rows:
+                        messagebox.showinfo("No Map Data", "No coordinates are available to plot.")
+                        return
+
+                html_text = self._build_map_html(map_rows)
+                map_path = Path(tempfile.gettempdir()) / "crash_dashboard_map.html"
+                map_path.write_text(html_text, encoding="utf-8")
+                webbrowser.open(map_path.as_uri())
+
+        def _build_map_html(self, rows: list[dict[str, object]]) -> str:
+                marker_rows: list[dict[str, object]] = []
+                for row in rows:
+                        severity = str(row.get("severity") or "Unknown")
+                        marker_rows.append(
+                                {
+                                        "lat": float(row["lat"]),
+                                        "lon": float(row["lon"]),
+                                        "severity": severity,
+                                        "color": MAP_SEVERITY_COLORS.get(severity, MAP_SEVERITY_COLORS["Unknown"]),
+                                        "popup": (
+                                                f"<strong>{escape(str(row.get('route') or 'Unknown'))}</strong><br/>"
+                                                f"Severity: {escape(severity)}<br/>"
+                                                f"Injured: {int(row.get('injured') or 0)} | Killed: {int(row.get('killed') or 0)}<br/>"
+                                                f"Date: {escape(str(row.get('date') or 'Unknown'))}<br/>"
+                                                f"Jurisdiction: {escape(str(row.get('jurisdiction') or 'Unknown'))}"
+                                        ),
+                                }
+                        )
+
+                markers_json = json.dumps(marker_rows)
+                severity_json = json.dumps(SEVERITY_ORDER)
+
+                return f"""<!doctype html>
+<html lang=\"en\">
+    <head>
+        <meta charset=\"UTF-8\" />
+        <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />
+        <title>Crash Map</title>
+        <link
+            rel=\"stylesheet\"
+            href=\"https://unpkg.com/leaflet@1.9.4/dist/leaflet.css\"
+            integrity=\"sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=\"
+            crossorigin=\"\"
+        />
+        <style>
+            html, body {{
+                height: 100%;
+                margin: 0;
+                font-family: Segoe UI, Arial, sans-serif;
+                background: #f7f9fb;
+            }}
+            .shell {{
+                display: flex;
+                flex-direction: column;
+                height: 100%;
+            }}
+            .toolbar {{
+                padding: 10px 12px;
+                border-bottom: 1px solid #d7dde5;
+                background: #ffffff;
+            }}
+            .toolbar-title {{
+                font-size: 14px;
+                font-weight: 600;
+                color: #1b2533;
+                margin-bottom: 8px;
+            }}
+            .chips {{
+                display: flex;
+                flex-wrap: wrap;
+                gap: 6px;
+            }}
+            .chip {{
+                border: 1px solid #c4ccd7;
+                background: #ffffff;
+                color: #1b2533;
+                border-radius: 999px;
+                padding: 4px 10px;
+                cursor: pointer;
+            }}
+            .chip.active {{
+                background: #0972d3;
+                border-color: #0972d3;
+                color: white;
+            }}
+            #map {{
+                flex: 1;
+                min-height: 320px;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class=\"shell\">
+            <div class=\"toolbar\">
+                <div class=\"toolbar-title\">Crash Locations</div>
+                <div id=\"chips\" class=\"chips\"></div>
+            </div>
+            <div id=\"map\"></div>
+        </div>
+
+        <script src=\"https://unpkg.com/leaflet@1.9.4/dist/leaflet.js\" integrity=\"sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=\" crossorigin=\"\"></script>
+        <script>
+            const markers = {markers_json};
+            const severityOrder = {severity_json};
+            const selectedSeverities = new Set(severityOrder);
+
+            const map = L.map("map", {{ zoomControl: true, scrollWheelZoom: true }}).setView([36.7806, -76.1775], 11);
+            L.tileLayer("https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png", {{
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                maxZoom: 19,
+            }}).addTo(map);
+
+            const markerLayer = L.layerGroup().addTo(map);
+            const chipsEl = document.getElementById("chips");
+
+            function renderMarkers() {{
+                markerLayer.clearLayers();
+                const bounds = [];
+
+                for (const row of markers) {{
+                    if (!selectedSeverities.has(row.severity)) continue;
+                    const latLng = [row.lat, row.lon];
+                    bounds.push(latLng);
+                    const marker = L.circleMarker(latLng, {{
+                        radius: 6,
+                        color: row.color,
+                        weight: 2,
+                        fillColor: row.color,
+                        fillOpacity: 0.82,
+                    }});
+                    marker.bindPopup(row.popup);
+                    marker.addTo(markerLayer);
+                }}
+
+                if (bounds.length > 0) {{
+                    map.fitBounds(bounds, {{ padding: [20, 20] }});
+                }}
+            }}
+
+            function renderChips() {{
+                chipsEl.innerHTML = "";
+                for (const severity of severityOrder) {{
+                    const count = markers.filter((row) => row.severity === severity).length;
+                    const button = document.createElement("button");
+                    button.type = "button";
+                    button.className = "chip" + (selectedSeverities.has(severity) ? " active" : "");
+                    button.textContent = `${{severity}} (${{count}})`;
+                    button.addEventListener("click", () => {{
+                        if (selectedSeverities.has(severity) && selectedSeverities.size === 1) return;
+                        if (selectedSeverities.has(severity)) selectedSeverities.delete(severity);
+                        else selectedSeverities.add(severity);
+                        renderChips();
+                        renderMarkers();
+                    }});
+                    chipsEl.appendChild(button);
+                }}
+            }}
+
+            renderChips();
+            renderMarkers();
+        </script>
+    </body>
+</html>
+"""
 
     def _render_dashboard(self, summary: dict) -> None:
         dashboard = build_dashboard_data(summary)
