@@ -14,10 +14,10 @@ The default point and date filter match the example in the prompt:
 
 ```bash
 python crash_parser.py "https://REPLACE_WITH_ACTUAL_ENDPOINT_URL/query" \
-	--longitude -76.1775 \
-	--latitude 36.7806 \
-	--start-date 2020-01-01 \
-	--distance 1
+  --longitude -76.1775 \
+  --latitude 36.7806 \
+  --start-date 2020-01-01 \
+  --distance 1
 ```
 
 Save the returned GeoJSON to a file:
@@ -38,6 +38,7 @@ In the UI you can:
 
 - Enter the query endpoint URL
 - Set longitude, latitude, start date, and radius
+- Adjust distance from the origin using a miles slider
 - Override the WHERE clause if needed
 - View the record count and query parameters
 - Save the GeoJSON response as JSON

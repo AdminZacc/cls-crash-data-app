@@ -134,7 +134,8 @@ class CrashParserUI(tk.Tk):
         self.latitude_var = tk.StringVar(value=str(DEFAULT_LATITUDE))
         self.start_date_var = tk.StringVar(value="2020-01-01")
         self.end_date_var = tk.StringVar(value="")
-        self.distance_var = tk.StringVar(value=str(DEFAULT_DISTANCE_MILES))
+        self.distance_var = tk.DoubleVar(value=float(DEFAULT_DISTANCE_MILES))
+        self.distance_display_var = tk.StringVar(value=f"{float(DEFAULT_DISTANCE_MILES):.1f} mi")
         self.where_var = tk.StringVar(value="")
         self.timeout_var = tk.StringVar(value="30")
         self.json_out_var = tk.StringVar()
@@ -212,9 +213,30 @@ class CrashParserUI(tk.Tk):
         tk.Label(filter_frame, text="Distance (miles):").grid(
             row=2, column=0, sticky="w", pady=(10, 0)
         )
-        tk.Entry(filter_frame, textvariable=self.distance_var, width=12).grid(
-            row=2, column=1, sticky="w", padx=(8, 16), pady=(10, 0)
-        )
+        distance_container = tk.Frame(filter_frame, bg=AWS_BG)
+        distance_container.grid(row=2, column=1, sticky="ew", padx=(8, 16), pady=(10, 0))
+        tk.Scale(
+            distance_container,
+            from_=0.5,
+            to=50.0,
+            resolution=0.5,
+            orient=tk.HORIZONTAL,
+            variable=self.distance_var,
+            command=self._on_distance_slider,
+            length=220,
+            bg=AWS_BG,
+            highlightthickness=0,
+            troughcolor="#dbe5f0",
+            activebackground=AWS_ORANGE,
+        ).pack(side=tk.LEFT, fill=tk.X, expand=True)
+        tk.Label(
+            distance_container,
+            textvariable=self.distance_display_var,
+            bg=AWS_BG,
+            fg=AWS_MUTED,
+            width=8,
+            anchor="w",
+        ).pack(side=tk.LEFT, padx=(8, 0))
 
         tk.Label(filter_frame, text="WHERE clause (optional):").grid(
             row=2, column=2, sticky="w", pady=(10, 0)
@@ -365,6 +387,12 @@ class CrashParserUI(tk.Tk):
         if path:
             self.json_out_var.set(path)
 
+    def _on_distance_slider(self, value: str) -> None:
+        try:
+            self.distance_display_var.set(f"{float(value):.1f} mi")
+        except (TypeError, ValueError):
+            self.distance_display_var.set("0.0 mi")
+
     def _collect_query_values(self) -> dict[str, object]:
         api_url = self.api_url_var.get().strip()
         if not api_url:
@@ -373,17 +401,16 @@ class CrashParserUI(tk.Tk):
         longitude_value = self.longitude_var.get().strip()
         latitude_value = self.latitude_var.get().strip()
         start_date = self.start_date_var.get().strip() or "2020-01-01"
-        distance_value = self.distance_var.get().strip() or str(DEFAULT_DISTANCE_MILES)
+        distance = float(self.distance_var.get())
         where_clause = self.where_var.get().strip() or None
         timeout_value = self.timeout_var.get().strip() or "30"
 
         try:
             longitude = float(longitude_value)
             latitude = float(latitude_value)
-            distance = float(distance_value)
             timeout = float(timeout_value)
         except ValueError as exc:
-            raise ValueError("Longitude, latitude, distance, and timeout must be numeric.") from exc
+            raise ValueError("Longitude, latitude, and timeout must be numeric.") from exc
 
         return {
             "api_url": api_url,
