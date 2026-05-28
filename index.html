@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Virginia Crash Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Virginia Crash Map</p>
+          <h1>Crash Dashboard</h1>
+          <p class="hero-copy">
+            A static GitHub Pages dashboard that visualizes the saved crash
+            GeoJSON with an AWS-style layout.
+          </p>
+        </div>
+        <div class="hero-actions">
+          <button id="refreshButton" class="primary-button">
+            Refresh data
+          </button>
+          <p id="statusText" class="status-text">Loading output.json...</p>
+        </div>
+      </header>
+
+      <main>
+        <section class="section-grid" aria-label="dashboard summary">
+          <article class="metric-card">
+            <span class="metric-label">Records</span>
+            <strong id="recordsMetric" class="metric-value">0</strong>
+            <span class="metric-subtitle">Total crash features</span>
+          </article>
+          <article class="metric-card">
+            <span class="metric-label">Date Range</span>
+            <strong
+              id="dateRangeMetric"
+              class="metric-value metric-value--small"
+              >Unknown</strong
+            >
+            <span class="metric-subtitle">Earliest to latest crash</span>
+          </article>
+          <article class="metric-card">
+            <span class="metric-label">People Injured</span>
+            <strong id="injuredMetric" class="metric-value">0</strong>
+            <span class="metric-subtitle">Summed from all records</span>
+          </article>
+          <article class="metric-card">
+            <span class="metric-label">People Killed</span>
+            <strong id="killedMetric" class="metric-value">0</strong>
+            <span class="metric-subtitle">Summed from all records</span>
+          </article>
+          <article class="metric-card">
+            <span class="metric-label">Avg Vehicles</span>
+            <strong id="vehiclesMetric" class="metric-value">0.00</strong>
+            <span class="metric-subtitle">Average per crash</span>
+          </article>
+          <article class="metric-card metric-card--accent">
+            <span class="metric-label">Top Route</span>
+            <strong id="routeMetric" class="metric-value metric-value--small"
+              >Unknown</strong
+            >
+            <span class="metric-subtitle">Most frequent crash location</span>
+          </article>
+        </section>
+
+        <section class="panel-grid">
+          <article class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="panel-kicker">Severity</p>
+                <h2>Crash Severity Breakdown</h2>
+              </div>
+              <span class="panel-badge">Live from GeoJSON</span>
+            </div>
+            <div id="severityBars" class="severity-bars"></div>
+          </article>
+
+          <article class="panel panel--wide">
+            <div class="panel-header">
+              <div>
+                <p class="panel-kicker">Recent Records</p>
+                <h2>Latest Crashes</h2>
+              </div>
+              <div class="panel-tools">
+                <label class="search-box">
+                  <span>Search</span>
+                  <input
+                    id="searchInput"
+                    type="search"
+                    placeholder="Route, jurisdiction, severity..."
+                  />
+                </label>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Severity</th>
+                    <th>Injured</th>
+                    <th>Killed</th>
+                    <th>Vehicles</th>
+                    <th>Route</th>
+                    <th>Jurisdiction</th>
+                  </tr>
+                </thead>
+                <tbody id="crashTableBody"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="panel panel--log">
+          <div class="panel-header">
+            <div>
+              <p class="panel-kicker">Details</p>
+              <h2>Query Log</h2>
+            </div>
+          </div>
+          <pre id="queryLog" class="query-log">No data loaded yet.</pre>
+        </section>
+      </main>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

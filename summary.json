@@ -1,0 +1,66 @@
+{
+  "file": "CrashData_test_-841970982949175194.csv",
+  "total_crashes": 48402,
+  "date_range": {
+    "start": "2021-01-01T05:00:00",
+    "end": "2022-12-31T05:00:00"
+  },
+  "severity_counts": {
+    "K": 303,
+    "A": 2726,
+    "B": 9579,
+    "C": 6465,
+    "O": 29329
+  },
+  "total_people_injured": 30372,
+  "total_people_killed": 316,
+  "average_vehicles_per_crash": 1.96,
+  "top_collision_types": [
+    [
+      "Rear End",
+      15884
+    ],
+    [
+      "Angle",
+      14500
+    ],
+    [
+      "Fixed Object - Off Road",
+      6471
+    ],
+    [
+      "Sideswipe - Same Direction",
+      4579
+    ],
+    [
+      "Other",
+      2254
+    ]
+  ],
+  "top_weather_conditions": [
+    [
+      "1. No Adverse Condition (Clear/Cloudy)",
+      41043
+    ],
+    [
+      "5. Rain",
+      6275
+    ],
+    [
+      "4. Mist",
+      522
+    ],
+    [
+      "6. Snow",
+      277
+    ],
+    [
+      "3. Fog",
+      147
+    ]
+  ],
+  "crashes_by_year": {
+    "2021": 24991,
+    "2022": 23411
+  }
+}
