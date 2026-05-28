@@ -5,6 +5,7 @@ const elements = {
   statusText: document.getElementById("statusText"),
   refreshButton: document.getElementById("refreshButton"),
   searchInput: document.getElementById("searchInput"),
+  searchStatus: document.getElementById("searchStatus"),
   recordsMetric: document.getElementById("recordsMetric"),
   dateRangeMetric: document.getElementById("dateRangeMetric"),
   injuredMetric: document.getElementById("injuredMetric"),
@@ -14,10 +15,13 @@ const elements = {
   severityBars: document.getElementById("severityBars"),
   crashTableBody: document.getElementById("crashTableBody"),
   queryLog: document.getElementById("queryLog"),
+  crashMap: document.getElementById("crashMap"),
 };
 
 let allRows = [];
 let dashboard = null;
+let crashMap = null;
+let markerLayer = null;
 
 function setStatus(message, isError = false) {
   elements.statusText.textContent = message;
@@ -49,6 +53,36 @@ function severityClass(severity) {
     .trim()
     .toUpperCase();
   return `severity-pill severity-pill--${normalized.toLowerCase() || "unknown"}`;
+}
+
+function formatPopup(row) {
+  return `
+    <strong>${row.route}</strong><br />
+    Severity: ${row.severity}<br />
+    Injured: ${row.injured} | Killed: ${row.killed}<br />
+    Date: ${row.date}<br />
+    Jurisdiction: ${row.jurisdiction}
+  `;
+}
+
+function toggleSection(button) {
+  const targetId = button.getAttribute("data-collapse-target");
+  const target = targetId ? document.getElementById(targetId) : null;
+
+  if (!target) return;
+
+  const isHidden = !target.hidden;
+  target.hidden = isHidden;
+  const expandedLabel =
+    button.getAttribute("data-expanded-label") || "Hide section";
+  const collapsedLabel =
+    button.getAttribute("data-collapsed-label") || "Show section";
+  button.textContent = isHidden ? collapsedLabel : expandedLabel;
+  button.setAttribute("aria-expanded", String(!isHidden));
+
+  if (!isHidden && target.contains(elements.crashMap) && crashMap) {
+    setTimeout(() => crashMap.invalidateSize(), 0);
+  }
 }
 
 function buildRows(features) {
@@ -105,6 +139,8 @@ function buildRows(features) {
       route,
       jurisdiction,
       document: properties.DOCUMENT_NBR ?? "Unknown",
+      lat: Number(properties.LAT),
+      lon: Number(properties.LON),
     });
   }
 
@@ -158,6 +194,72 @@ function renderSeverityBars(severityCounts, total) {
   });
 }
 
+function initializeMap() {
+  if (crashMap || !elements.crashMap || typeof L === "undefined") return;
+
+  crashMap = L.map("crashMap", {
+    zoomControl: true,
+    scrollWheelZoom: false,
+  }).setView([36.7806, -76.1775], 11);
+
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19,
+  }).addTo(crashMap);
+
+  markerLayer = L.layerGroup().addTo(crashMap);
+}
+
+function renderMap(rows) {
+  initializeMap();
+
+  if (!crashMap || !markerLayer) return;
+
+  markerLayer.clearLayers();
+
+  const bounds = [];
+  for (const row of rows) {
+    if (!Number.isFinite(row.lat) || !Number.isFinite(row.lon)) continue;
+
+    const latLng = [row.lat, row.lon];
+    bounds.push(latLng);
+
+    const marker = L.circleMarker(latLng, {
+      radius: 6,
+      color:
+        row.severity === "K"
+          ? "#7f1d1d"
+          : row.severity === "A"
+            ? "#b91c1c"
+            : row.severity === "B"
+              ? "#d97706"
+              : row.severity === "C"
+                ? "#0369a1"
+                : "#6b7280",
+      weight: 2,
+      fillColor:
+        row.severity === "K"
+          ? "#7f1d1d"
+          : row.severity === "A"
+            ? "#b91c1c"
+            : row.severity === "B"
+              ? "#d97706"
+              : row.severity === "C"
+                ? "#0369a1"
+                : "#6b7280",
+      fillOpacity: 0.82,
+    });
+
+    marker.bindPopup(formatPopup(row));
+    marker.addTo(markerLayer);
+  }
+
+  if (bounds.length > 0) {
+    crashMap.fitBounds(bounds, { padding: [20, 20] });
+  }
+}
+
 function renderTable(rows) {
   const query = elements.searchInput.value.trim().toLowerCase();
   const filtered = query
@@ -175,13 +277,19 @@ function renderTable(rows) {
       })
     : rows;
 
+  if (elements.searchStatus) {
+    elements.searchStatus.textContent = query
+      ? `Showing ${filtered.length} of ${rows.length} records for "${elements.searchInput.value.trim()}"`
+      : `Showing all ${rows.length} records`;
+  }
+
   elements.crashTableBody.innerHTML = "";
 
   if (!filtered.length) {
     const row = document.createElement("tr");
     row.innerHTML = `<td colspan="7"><div class="empty-state">No records match the current filter.</div></td>`;
     elements.crashTableBody.appendChild(row);
-    return;
+    return filtered;
   }
 
   for (const rowData of filtered.slice(0, 50)) {
@@ -197,6 +305,8 @@ function renderTable(rows) {
     `;
     elements.crashTableBody.appendChild(tr);
   }
+
+  return filtered;
 }
 
 function renderDashboard(data) {
@@ -211,7 +321,7 @@ function renderDashboard(data) {
   elements.routeMetric.textContent = `${dashboard.topRoute.name} (${dashboard.topRoute.count})`;
 
   renderSeverityBars(dashboard.severityCounts, dashboard.records);
-  renderTable(allRows);
+  renderMap(renderTable(allRows));
 
   elements.queryLog.textContent = JSON.stringify(data, null, 2);
   setStatus(`Loaded ${dashboard.records} crash records from output.json.`);
@@ -240,8 +350,14 @@ async function loadData() {
 elements.refreshButton.addEventListener("click", loadData);
 elements.searchInput.addEventListener("input", () => {
   if (dashboard) {
-    renderTable(allRows);
+    renderMap(renderTable(allRows));
   }
+});
+
+document.querySelectorAll("[data-collapse-target]").forEach((button) => {
+  button.addEventListener("click", () => {
+    toggleSection(button);
+  });
 });
 
 loadData();

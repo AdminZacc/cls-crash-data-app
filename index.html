@@ -10,6 +10,12 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -32,58 +38,119 @@
       </header>
 
       <main>
-        <section class="section-grid" aria-label="dashboard summary">
-          <article class="metric-card">
-            <span class="metric-label">Records</span>
-            <strong id="recordsMetric" class="metric-value">0</strong>
-            <span class="metric-subtitle">Total crash features</span>
-          </article>
-          <article class="metric-card">
-            <span class="metric-label">Date Range</span>
-            <strong
-              id="dateRangeMetric"
-              class="metric-value metric-value--small"
-              >Unknown</strong
+        <section class="panel panel--summary" data-collapsible>
+          <div class="panel-header">
+            <div>
+              <p class="panel-kicker">Overview</p>
+              <h2>Crash Summary</h2>
+            </div>
+            <button
+              id="summaryToggle"
+              class="secondary-button"
+              type="button"
+              aria-expanded="true"
+              data-collapse-target="summaryBody"
+              data-expanded-label="Hide summary"
+              data-collapsed-label="Show summary"
             >
-            <span class="metric-subtitle">Earliest to latest crash</span>
-          </article>
-          <article class="metric-card">
-            <span class="metric-label">People Injured</span>
-            <strong id="injuredMetric" class="metric-value">0</strong>
-            <span class="metric-subtitle">Summed from all records</span>
-          </article>
-          <article class="metric-card">
-            <span class="metric-label">People Killed</span>
-            <strong id="killedMetric" class="metric-value">0</strong>
-            <span class="metric-subtitle">Summed from all records</span>
-          </article>
-          <article class="metric-card">
-            <span class="metric-label">Avg Vehicles</span>
-            <strong id="vehiclesMetric" class="metric-value">0.00</strong>
-            <span class="metric-subtitle">Average per crash</span>
-          </article>
-          <article class="metric-card metric-card--accent">
-            <span class="metric-label">Top Route</span>
-            <strong id="routeMetric" class="metric-value metric-value--small"
-              >Unknown</strong
+              Hide summary
+            </button>
+          </div>
+          <div
+            id="summaryBody"
+            class="section-grid panel-body"
+            aria-label="dashboard summary"
+          >
+            <article class="metric-card">
+              <span class="metric-label">Records</span>
+              <strong id="recordsMetric" class="metric-value">0</strong>
+              <span class="metric-subtitle">Total crash features</span>
+            </article>
+            <article class="metric-card">
+              <span class="metric-label">Date Range</span>
+              <strong
+                id="dateRangeMetric"
+                class="metric-value metric-value--small"
+                >Unknown</strong
+              >
+              <span class="metric-subtitle">Earliest to latest crash</span>
+            </article>
+            <article class="metric-card">
+              <span class="metric-label">People Injured</span>
+              <strong id="injuredMetric" class="metric-value">0</strong>
+              <span class="metric-subtitle">Summed from all records</span>
+            </article>
+            <article class="metric-card">
+              <span class="metric-label">People Killed</span>
+              <strong id="killedMetric" class="metric-value">0</strong>
+              <span class="metric-subtitle">Summed from all records</span>
+            </article>
+            <article class="metric-card">
+              <span class="metric-label">Avg Vehicles</span>
+              <strong id="vehiclesMetric" class="metric-value">0.00</strong>
+              <span class="metric-subtitle">Average per crash</span>
+            </article>
+            <article class="metric-card metric-card--accent">
+              <span class="metric-label">Top Route</span>
+              <strong id="routeMetric" class="metric-value metric-value--small"
+                >Unknown</strong
+              >
+              <span class="metric-subtitle">Most frequent crash location</span>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel panel--map" data-collapsible>
+          <div class="panel-header">
+            <div>
+              <p class="panel-kicker">Map</p>
+              <h2>Crash Locations</h2>
+            </div>
+            <button
+              id="mapToggle"
+              class="secondary-button"
+              type="button"
+              aria-expanded="true"
+              data-collapse-target="mapBody"
+              data-expanded-label="Hide map"
+              data-collapsed-label="Show map"
             >
-            <span class="metric-subtitle">Most frequent crash location</span>
-          </article>
+              Hide map
+            </button>
+          </div>
+          <div id="mapBody" class="panel-body">
+            <div id="crashMap" class="crash-map" aria-label="Crash map"></div>
+          </div>
         </section>
 
         <section class="panel-grid">
-          <article class="panel">
+          <article class="panel" data-collapsible>
             <div class="panel-header">
               <div>
                 <p class="panel-kicker">Severity</p>
                 <h2>Crash Severity Breakdown</h2>
               </div>
-              <span class="panel-badge">Live from GeoJSON</span>
+              <div class="panel-actions">
+                <span class="panel-badge">Live from GeoJSON</span>
+                <button
+                  id="severityToggle"
+                  class="secondary-button"
+                  type="button"
+                  aria-expanded="true"
+                  data-collapse-target="severityBody"
+                  data-expanded-label="Hide section"
+                  data-collapsed-label="Show section"
+                >
+                  Hide section
+                </button>
+              </div>
             </div>
-            <div id="severityBars" class="severity-bars"></div>
+            <div id="severityBody" class="panel-body">
+              <div id="severityBars" class="severity-bars"></div>
+            </div>
           </article>
 
-          <article class="panel panel--wide">
+          <article class="panel panel--wide" data-collapsible>
             <div class="panel-header">
               <div>
                 <p class="panel-kicker">Recent Records</p>
@@ -98,39 +165,75 @@
                     placeholder="Route, jurisdiction, severity..."
                   />
                 </label>
+                <p id="searchStatus" class="search-status">
+                  Showing all records
+                </p>
+                <button
+                  id="tableToggle"
+                  class="secondary-button"
+                  type="button"
+                  aria-expanded="true"
+                  data-collapse-target="tableBody"
+                  data-expanded-label="Hide table"
+                  data-collapsed-label="Show table"
+                >
+                  Hide table
+                </button>
               </div>
             </div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Severity</th>
-                    <th>Injured</th>
-                    <th>Killed</th>
-                    <th>Vehicles</th>
-                    <th>Route</th>
-                    <th>Jurisdiction</th>
-                  </tr>
-                </thead>
-                <tbody id="crashTableBody"></tbody>
-              </table>
+            <div id="tableBody" class="panel-body">
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Severity</th>
+                      <th>Injured</th>
+                      <th>Killed</th>
+                      <th>Vehicles</th>
+                      <th>Route</th>
+                      <th>Jurisdiction</th>
+                    </tr>
+                  </thead>
+                  <tbody id="crashTableBody"></tbody>
+                </table>
+              </div>
             </div>
           </article>
         </section>
 
-        <section class="panel panel--log">
+        <section class="panel panel--log" data-collapsible>
           <div class="panel-header">
             <div>
               <p class="panel-kicker">Details</p>
               <h2>Query Log</h2>
             </div>
+            <div class="panel-actions">
+              <button
+                id="queryLogToggle"
+                class="secondary-button"
+                type="button"
+                aria-expanded="true"
+                data-collapse-target="queryLogBody"
+                data-expanded-label="Hide log"
+                data-collapsed-label="Show log"
+              >
+                Hide log
+              </button>
+            </div>
           </div>
-          <pre id="queryLog" class="query-log">No data loaded yet.</pre>
+          <div id="queryLogBody" class="panel-body">
+            <pre id="queryLog" class="query-log">No data loaded yet.</pre>
+          </div>
         </section>
       </main>
     </div>
 
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
     <script src="app.js"></script>
   </body>
 </html>
