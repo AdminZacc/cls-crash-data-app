@@ -497,72 +497,72 @@ class CrashParserUI(tk.Tk):
         self.last_summary = None
         self._clear_dashboard()
 
-        def _open_map(self) -> None:
-                if not self.last_summary:
-                        messagebox.showinfo("No Result", "Run a query first.")
-                        return
+    def _open_map(self) -> None:
+        if not self.last_summary:
+            messagebox.showinfo("No Result", "Run a query first.")
+            return
 
-                map_rows: list[dict[str, object]] = []
-            features = self.last_summary.get("geojson", {}).get("features", [])
-            for feature in features:
-                properties = feature.get("properties", {}) if isinstance(feature, dict) else {}
-                severity_value = str(properties.get("CRASH_SEVERITY") or "Unknown").strip().upper()
-                if severity_value not in SEVERITY_ORDER:
-                    severity_value = severity_value[:1] if severity_value else "Unknown"
-                if severity_value not in SEVERITY_ORDER:
-                    severity_value = "Unknown"
+        map_rows: list[dict[str, object]] = []
+        features = self.last_summary.get("geojson", {}).get("features", [])
+        for feature in features:
+            properties = feature.get("properties", {}) if isinstance(feature, dict) else {}
+            severity_value = str(properties.get("CRASH_SEVERITY") or "Unknown").strip().upper()
+            if severity_value not in SEVERITY_ORDER:
+                severity_value = severity_value[:1] if severity_value else "Unknown"
+            if severity_value not in SEVERITY_ORDER:
+                severity_value = "Unknown"
 
-                row = {
-                    "date": _format_crash_dt(properties.get("CRASH_DT")),
-                    "severity": severity_value,
-                    "injured": int(_safe_float(properties.get("PERSONS_INJURED"))),
-                    "killed": int(_safe_float(properties.get("K_PEOPLE"))),
-                    "route": str(properties.get("ROUTE_OR_STREET_NM") or "Unknown"),
-                    "jurisdiction": str(properties.get("PHYSICAL_JURIS") or "Unknown"),
-                    "lat": properties.get("LAT"),
-                    "lon": properties.get("LON"),
+            row = {
+                "date": _format_crash_dt(properties.get("CRASH_DT")),
+                "severity": severity_value,
+                "injured": int(_safe_float(properties.get("PERSONS_INJURED"))),
+                "killed": int(_safe_float(properties.get("K_PEOPLE"))),
+                "route": str(properties.get("ROUTE_OR_STREET_NM") or "Unknown"),
+                "jurisdiction": str(properties.get("PHYSICAL_JURIS") or "Unknown"),
+                "lat": properties.get("LAT"),
+                "lon": properties.get("LON"),
+            }
+
+            # Filter out rows that cannot be placed on the map.
+            lat = row.get("lat")
+            lon = row.get("lon")
+            if not isinstance(lat, (int, float)) or not isinstance(lon, (int, float)):
+                continue
+            map_rows.append(row)
+
+        if not map_rows:
+            messagebox.showinfo("No Map Data", "No coordinates are available to plot.")
+            return
+
+        html_text = self._build_map_html(map_rows)
+        map_path = Path(tempfile.gettempdir()) / "crash_dashboard_map.html"
+        map_path.write_text(html_text, encoding="utf-8")
+        webbrowser.open(map_path.as_uri())
+
+    def _build_map_html(self, rows: list[dict[str, object]]) -> str:
+        marker_rows: list[dict[str, object]] = []
+        for row in rows:
+            severity = str(row.get("severity") or "Unknown")
+            marker_rows.append(
+                {
+                    "lat": float(row["lat"]),
+                    "lon": float(row["lon"]),
+                    "severity": severity,
+                    "color": MAP_SEVERITY_COLORS.get(severity, MAP_SEVERITY_COLORS["Unknown"]),
+                    "popup": (
+                        f"<strong>{escape(str(row.get('route') or 'Unknown'))}</strong><br/>"
+                        f"Severity: {escape(severity)}<br/>"
+                        f"Injured: {int(row.get('injured') or 0)} | Killed: {int(row.get('killed') or 0)}<br/>"
+                        f"Date: {escape(str(row.get('date') or 'Unknown'))}<br/>"
+                        f"Jurisdiction: {escape(str(row.get('jurisdiction') or 'Unknown'))}"
+                    ),
                 }
+            )
 
-                        # Filter out rows that cannot be placed on the map.
-                        lat = row.get("lat")
-                        lon = row.get("lon")
-                        if not isinstance(lat, (int, float)) or not isinstance(lon, (int, float)):
-                                continue
-                        map_rows.append(row)
+        markers_json = json.dumps(marker_rows)
+        severity_json = json.dumps(SEVERITY_ORDER)
 
-                if not map_rows:
-                        messagebox.showinfo("No Map Data", "No coordinates are available to plot.")
-                        return
-
-                html_text = self._build_map_html(map_rows)
-                map_path = Path(tempfile.gettempdir()) / "crash_dashboard_map.html"
-                map_path.write_text(html_text, encoding="utf-8")
-                webbrowser.open(map_path.as_uri())
-
-        def _build_map_html(self, rows: list[dict[str, object]]) -> str:
-                marker_rows: list[dict[str, object]] = []
-                for row in rows:
-                        severity = str(row.get("severity") or "Unknown")
-                        marker_rows.append(
-                                {
-                                        "lat": float(row["lat"]),
-                                        "lon": float(row["lon"]),
-                                        "severity": severity,
-                                        "color": MAP_SEVERITY_COLORS.get(severity, MAP_SEVERITY_COLORS["Unknown"]),
-                                        "popup": (
-                                                f"<strong>{escape(str(row.get('route') or 'Unknown'))}</strong><br/>"
-                                                f"Severity: {escape(severity)}<br/>"
-                                                f"Injured: {int(row.get('injured') or 0)} | Killed: {int(row.get('killed') or 0)}<br/>"
-                                                f"Date: {escape(str(row.get('date') or 'Unknown'))}<br/>"
-                                                f"Jurisdiction: {escape(str(row.get('jurisdiction') or 'Unknown'))}"
-                                        ),
-                                }
-                        )
-
-                markers_json = json.dumps(marker_rows)
-                severity_json = json.dumps(SEVERITY_ORDER)
-
-                return f"""<!doctype html>
+        return f"""<!doctype html>
 <html lang=\"en\">
     <head>
         <meta charset=\"UTF-8\" />
