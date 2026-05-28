@@ -6,6 +6,9 @@ const elements = {
   refreshButton: document.getElementById("refreshButton"),
   searchInput: document.getElementById("searchInput"),
   searchStatus: document.getElementById("searchStatus"),
+  tableSeverityFilter: document.getElementById("tableSeverityFilter"),
+  tableJurisdictionFilter: document.getElementById("tableJurisdictionFilter"),
+  tableClearFilters: document.getElementById("tableClearFilters"),
   recordsMetric: document.getElementById("recordsMetric"),
   dateRangeMetric: document.getElementById("dateRangeMetric"),
   injuredMetric: document.getElementById("injuredMetric"),
@@ -23,6 +26,7 @@ let allRows = [];
 let dashboard = null;
 let crashMap = null;
 let markerLayer = null;
+let selectedMapSeverities = new Set(severityOrder);
 let selectedMapSeverities = new Set(severityOrder);
 
 function setStatus(message, isError = false) {
@@ -196,6 +200,59 @@ function renderSeverityBars(severityCounts, total) {
   });
 }
 
+function getSearchFilteredRows(rows) {
+  const query = elements.searchInput.value.trim().toLowerCase();
+
+  if (!query) {
+    return rows;
+  }
+
+  return rows.filter((row) => {
+    const haystack = [
+      row.date,
+      row.severity,
+      row.route,
+      row.jurisdiction,
+      row.document,
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    return haystack.includes(query);
+  });
+}
+
+function getTableFilteredRows(rows) {
+  let filtered = getSearchFilteredRows(rows);
+
+  if (
+    elements.tableSeverityFilter &&
+    elements.tableSeverityFilter.value !== "All"
+  ) {
+    filtered = filtered.filter(
+      (row) => row.severity === elements.tableSeverityFilter.value,
+    );
+  }
+
+  if (
+    elements.tableJurisdictionFilter &&
+    elements.tableJurisdictionFilter.value !== "All"
+  ) {
+    filtered = filtered.filter(
+      (row) =>
+        String(row.jurisdiction) === elements.tableJurisdictionFilter.value,
+    );
+  }
+
+  return filtered;
+}
+
+function getMapFilteredRows(rows) {
+  return getSearchFilteredRows(rows).filter((row) =>
+    selectedMapSeverities.has(row.severity),
+  );
+}
+
 function initializeMap() {
   if (crashMap || !elements.crashMap || typeof L === "undefined") return;
 
@@ -211,6 +268,19 @@ function initializeMap() {
   }).addTo(crashMap);
 
   markerLayer = L.layerGroup().addTo(crashMap);
+}
+
+function syncMapSeverityFilterButtons() {
+  if (!elements.mapSeverityFilters) return;
+
+  elements.mapSeverityFilters
+    .querySelectorAll("[data-severity]")
+    .forEach((button) => {
+      const severity = button.dataset.severity;
+      const isActive = selectedMapSeverities.has(severity);
+      button.classList.toggle("severity-filter-chip--active", isActive);
+      button.setAttribute("aria-pressed", String(isActive));
+    });
 }
 
 function renderMapSeverityFilters(severityCounts) {
@@ -243,7 +313,8 @@ function renderMapSeverityFilters(severityCounts) {
         selectedMapSeverities.add(severity);
       }
 
-      renderMap(renderTable(allRows));
+      syncMapSeverityFilterButtons();
+      renderMap(allRows);
     });
 
     elements.mapSeverityFilters.appendChild(button);
@@ -258,8 +329,7 @@ function renderMap(rows) {
   markerLayer.clearLayers();
 
   const bounds = [];
-  for (const row of rows) {
-    if (!selectedMapSeverities.has(row.severity)) continue;
+  for (const row of getMapFilteredRows(rows)) {
     if (!Number.isFinite(row.lat) || !Number.isFinite(row.lon)) continue;
 
     const latLng = [row.lat, row.lon];
@@ -301,25 +371,12 @@ function renderMap(rows) {
 }
 
 function renderTable(rows) {
-  const query = elements.searchInput.value.trim().toLowerCase();
-  const filtered = query
-    ? rows.filter((row) => {
-        const haystack = [
-          row.date,
-          row.severity,
-          row.route,
-          row.jurisdiction,
-          row.document,
-        ]
-          .join(" ")
-          .toLowerCase();
-        return haystack.includes(query);
-      })
-    : rows;
+  const filtered = getTableFilteredRows(rows);
+  const query = elements.searchInput.value.trim();
 
   if (elements.searchStatus) {
     elements.searchStatus.textContent = query
-      ? `Showing ${filtered.length} of ${rows.length} records for "${elements.searchInput.value.trim()}"`
+      ? `Showing ${filtered.length} of ${rows.length} records for "${query}"`
       : `Showing all ${rows.length} records`;
   }
 
@@ -362,7 +419,34 @@ function renderDashboard(data) {
 
   renderSeverityBars(dashboard.severityCounts, dashboard.records);
   renderMapSeverityFilters(dashboard.severityCounts);
-  renderMap(renderTable(allRows));
+  if (elements.tableSeverityFilter) {
+    elements.tableSeverityFilter.innerHTML =
+      '<option value="All">All severities</option>';
+    severityOrder.forEach((severity) => {
+      const option = document.createElement("option");
+      option.value = severity;
+      option.textContent = severity;
+      elements.tableSeverityFilter.appendChild(option);
+    });
+  }
+
+  if (elements.tableJurisdictionFilter) {
+    const jurisdictions = [
+      ...new Set(allRows.map((row) => String(row.jurisdiction))),
+    ].sort((a, b) => a.localeCompare(b));
+    elements.tableJurisdictionFilter.innerHTML =
+      '<option value="All">All jurisdictions</option>';
+    jurisdictions.forEach((jurisdiction) => {
+      const option = document.createElement("option");
+      option.value = jurisdiction;
+      option.textContent = jurisdiction;
+      elements.tableJurisdictionFilter.appendChild(option);
+    });
+  }
+
+  syncMapSeverityFilterButtons();
+  renderMap(allRows);
+  renderTable(allRows);
 
   elements.queryLog.textContent = JSON.stringify(data, null, 2);
   setStatus(`Loaded ${dashboard.records} crash records from output.json.`);
@@ -391,9 +475,42 @@ async function loadData() {
 elements.refreshButton.addEventListener("click", loadData);
 elements.searchInput.addEventListener("input", () => {
   if (dashboard) {
-    renderMap(renderTable(allRows));
+    renderTable(allRows);
+    renderMap(allRows);
   }
 });
+
+if (elements.tableSeverityFilter) {
+  elements.tableSeverityFilter.addEventListener("change", () => {
+    if (dashboard) {
+      renderTable(allRows);
+    }
+  });
+}
+
+if (elements.tableJurisdictionFilter) {
+  elements.tableJurisdictionFilter.addEventListener("change", () => {
+    if (dashboard) {
+      renderTable(allRows);
+    }
+  });
+}
+
+if (elements.tableClearFilters) {
+  elements.tableClearFilters.addEventListener("click", () => {
+    if (elements.searchInput) elements.searchInput.value = "";
+    if (elements.tableSeverityFilter)
+      elements.tableSeverityFilter.value = "All";
+    if (elements.tableJurisdictionFilter)
+      elements.tableJurisdictionFilter.value = "All";
+    selectedMapSeverities = new Set(severityOrder);
+    syncMapSeverityFilterButtons();
+    if (dashboard) {
+      renderTable(allRows);
+      renderMap(allRows);
+    }
+  });
+}
 
 document.querySelectorAll("[data-collapse-target]").forEach((button) => {
   button.addEventListener("click", () => {

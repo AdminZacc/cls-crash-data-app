@@ -365,6 +365,35 @@ main {
   box-shadow: 0 0 0 4px rgba(9, 114, 211, 0.1);
 }
 
+.table-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: end;
+}
+
+.filter-select {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.filter-select select {
+  min-width: 180px;
+  padding: 11px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: #fbfdff;
+  color: var(--text);
+  outline: none;
+}
+
+.filter-select select:focus {
+  border-color: rgba(9, 114, 211, 0.55);
+  box-shadow: 0 0 0 4px rgba(9, 114, 211, 0.1);
+}
+
 .panel-body {
   display: block;
 }
