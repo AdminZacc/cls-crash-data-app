@@ -25,19 +25,95 @@
           <p class="eyebrow">Virginia Crash Map</p>
           <h1>Crash Dashboard</h1>
           <p class="hero-copy">
-            A static GitHub Pages dashboard that visualizes the saved crash
-            GeoJSON with an AWS-style layout.
+            A web-first dashboard that runs live ArcGIS crash queries directly
+            in your browser.
           </p>
         </div>
         <div class="hero-actions">
           <button id="refreshButton" class="primary-button">
-            Refresh data
+            Refresh current source
           </button>
-          <p id="statusText" class="status-text">Loading output.json...</p>
+          <p id="statusText" class="status-text">
+            Running live ArcGIS query...
+          </p>
         </div>
       </header>
 
       <main>
+        <section class="panel" data-collapsible>
+          <div class="panel-header">
+            <div>
+              <p class="panel-kicker">Live Query</p>
+              <h2>ArcGIS Query Controls</h2>
+            </div>
+            <div class="panel-actions">
+              <button
+                id="queryToggle"
+                class="secondary-button"
+                type="button"
+                aria-expanded="true"
+                data-collapse-target="queryBody"
+                data-expanded-label="Hide controls"
+                data-collapsed-label="Show controls"
+              >
+                Hide controls
+              </button>
+            </div>
+          </div>
+          <div id="queryBody" class="panel-body">
+            <div class="query-grid">
+              <label class="filter-select query-wide">
+                <span>ArcGIS query endpoint</span>
+                <input
+                  id="apiUrlInput"
+                  type="url"
+                  placeholder="https://.../FeatureServer/0/query"
+                />
+              </label>
+              <label class="filter-select">
+                <span>Longitude</span>
+                <input id="longitudeInput" type="number" step="any" />
+              </label>
+              <label class="filter-select">
+                <span>Latitude</span>
+                <input id="latitudeInput" type="number" step="any" />
+              </label>
+              <label class="filter-select">
+                <span>Start date</span>
+                <input id="startDateInput" type="date" />
+              </label>
+              <label class="filter-select">
+                <span>End date (optional)</span>
+                <input id="endDateInput" type="date" />
+              </label>
+              <label class="filter-select">
+                <span>Distance (miles)</span>
+                <input id="distanceInput" type="number" min="0.1" step="0.1" />
+              </label>
+              <label class="filter-select query-wide">
+                <span>WHERE override (optional)</span>
+                <input
+                  id="whereInput"
+                  type="text"
+                  placeholder="CRASH_DT >= DATE '2020-01-01'"
+                />
+              </label>
+            </div>
+            <div class="query-actions">
+              <button id="runQueryButton" class="primary-button" type="button">
+                Run Live Query
+              </button>
+              <button
+                id="loadOutputButton"
+                class="secondary-button"
+                type="button"
+              >
+                Load output.json
+              </button>
+            </div>
+          </div>
+        </section>
+
         <section class="panel panel--summary" data-collapsible>
           <div class="panel-header">
             <div>

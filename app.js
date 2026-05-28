@@ -1,9 +1,24 @@
 const DATA_URL = "./output.json";
+const DEFAULT_API_URL =
+  "https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/Full_Crash/FeatureServer/0/query";
+const DEFAULT_LONGITUDE = -76.1775;
+const DEFAULT_LATITUDE = 36.7806;
+const DEFAULT_DISTANCE_MILES = 1;
+const FEET_PER_MILE = 5280;
 const severityOrder = ["K", "A", "B", "C", "O", "Unknown"];
 
 const elements = {
   statusText: document.getElementById("statusText"),
   refreshButton: document.getElementById("refreshButton"),
+  runQueryButton: document.getElementById("runQueryButton"),
+  loadOutputButton: document.getElementById("loadOutputButton"),
+  apiUrlInput: document.getElementById("apiUrlInput"),
+  longitudeInput: document.getElementById("longitudeInput"),
+  latitudeInput: document.getElementById("latitudeInput"),
+  startDateInput: document.getElementById("startDateInput"),
+  endDateInput: document.getElementById("endDateInput"),
+  distanceInput: document.getElementById("distanceInput"),
+  whereInput: document.getElementById("whereInput"),
   searchInput: document.getElementById("searchInput"),
   searchStatus: document.getElementById("searchStatus"),
   tableSeverityFilter: document.getElementById("tableSeverityFilter"),
@@ -27,6 +42,7 @@ let dashboard = null;
 let crashMap = null;
 let markerLayer = null;
 let selectedMapSeverities = new Set(severityOrder);
+let lastLoadedSource = "api";
 
 function setStatus(message, isError = false) {
   elements.statusText.textContent = message;
@@ -38,6 +54,70 @@ function setStatus(message, isError = false) {
 function safeNumber(value) {
   const num = Number(value);
   return Number.isFinite(num) ? num : 0;
+}
+
+function getQueryConfig() {
+  const apiUrl = (elements.apiUrlInput?.value || "").trim();
+  if (!apiUrl) {
+    throw new Error("Enter an ArcGIS query endpoint URL.");
+  }
+
+  const longitude = Number(elements.longitudeInput?.value);
+  const latitude = Number(elements.latitudeInput?.value);
+  const distanceMiles = Number(elements.distanceInput?.value);
+
+  if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) {
+    throw new Error("Longitude and latitude must be numeric.");
+  }
+
+  if (!Number.isFinite(distanceMiles) || distanceMiles <= 0) {
+    throw new Error("Distance must be a positive number.");
+  }
+
+  const startDate = (elements.startDateInput?.value || "2020-01-01").trim();
+  const endDate = (elements.endDateInput?.value || "").trim();
+  const where = (elements.whereInput?.value || "").trim();
+
+  return {
+    apiUrl,
+    longitude,
+    latitude,
+    distanceMiles,
+    startDate,
+    endDate,
+    where,
+  };
+}
+
+function buildWhereClause(startDate, endDate, whereOverride) {
+  if (whereOverride) {
+    return whereOverride;
+  }
+
+  if (endDate) {
+    const endDateValue = new Date(`${endDate}T00:00:00`);
+    if (Number.isNaN(endDateValue.getTime())) {
+      throw new Error("End date must be in YYYY-MM-DD format.");
+    }
+    endDateValue.setDate(endDateValue.getDate() + 1);
+    const inclusiveUpperBound = endDateValue.toISOString().slice(0, 10);
+    return `CRASH_DT >= DATE '${startDate}' AND CRASH_DT < DATE '${inclusiveUpperBound}'`;
+  }
+
+  return `CRASH_DT >= DATE '${startDate}'`;
+}
+
+function buildArcGisQueryParams(config) {
+  return {
+    where: buildWhereClause(config.startDate, config.endDate, config.where),
+    geometry: JSON.stringify({ x: config.longitude, y: config.latitude }),
+    geometryType: "esriGeometryPoint",
+    spatialRel: "esriSpatialRelIntersects",
+    distance: config.distanceMiles * FEET_PER_MILE,
+    units: "esriSRUnit_Foot",
+    outFields: "*",
+    f: "geojson",
+  };
 }
 
 function formatDateTime(value) {
@@ -457,10 +537,9 @@ function renderDashboard(data) {
   renderTable(allRows);
 
   elements.queryLog.textContent = JSON.stringify(data, null, 2);
-  setStatus(`Loaded ${dashboard.records} crash records from output.json.`);
 }
 
-async function loadData() {
+async function loadOutputData() {
   setStatus("Loading output.json...");
   try {
     const response = await fetch(DATA_URL, { cache: "no-store" });
@@ -472,6 +551,8 @@ async function loadData() {
       throw new Error("Invalid GeoJSON structure.");
     }
     renderDashboard(data);
+    lastLoadedSource = "output";
+    setStatus(`Loaded ${dashboard.records} crash records from output.json.`);
   } catch (error) {
     setStatus(`Failed to load output.json: ${error.message}`, true);
     elements.queryLog.textContent = `Unable to load ${DATA_URL}.\n\n${error.stack || error.message}`;
@@ -480,7 +561,67 @@ async function loadData() {
   }
 }
 
-elements.refreshButton.addEventListener("click", loadData);
+async function loadApiData() {
+  try {
+    const config = getQueryConfig();
+    const params = buildArcGisQueryParams(config);
+    const url = new URL(config.apiUrl);
+    Object.entries(params).forEach(([key, value]) => {
+      url.searchParams.set(key, String(value));
+    });
+
+    setStatus("Running live ArcGIS query...");
+    const response = await fetch(url.toString(), { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`ArcGIS request failed with HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (!data || !Array.isArray(data.features)) {
+      throw new Error("Invalid GeoJSON response from ArcGIS endpoint.");
+    }
+
+    renderDashboard(data);
+    elements.queryLog.textContent = JSON.stringify(
+      {
+        source: "api",
+        request: {
+          apiUrl: config.apiUrl,
+          longitude: config.longitude,
+          latitude: config.latitude,
+          distanceMiles: config.distanceMiles,
+          startDate: config.startDate,
+          endDate: config.endDate || null,
+          where: params.where,
+        },
+        response: data,
+      },
+      null,
+      2,
+    );
+    lastLoadedSource = "api";
+    setStatus(
+      `Loaded ${dashboard.records} crash records from live ArcGIS query.`,
+    );
+  } catch (error) {
+    setStatus(`Live query failed: ${error.message}`, true);
+    elements.queryLog.textContent = `Live query failed.\n\n${error.stack || error.message}`;
+  }
+}
+
+elements.refreshButton.addEventListener("click", () => {
+  if (lastLoadedSource === "output") {
+    loadOutputData();
+  } else {
+    loadApiData();
+  }
+});
+if (elements.runQueryButton) {
+  elements.runQueryButton.addEventListener("click", loadApiData);
+}
+if (elements.loadOutputButton) {
+  elements.loadOutputButton.addEventListener("click", loadOutputData);
+}
 elements.searchInput.addEventListener("input", () => {
   if (dashboard) {
     renderTable(allRows);
@@ -526,4 +667,20 @@ document.querySelectorAll("[data-collapse-target]").forEach((button) => {
   });
 });
 
-loadData();
+if (elements.apiUrlInput && !elements.apiUrlInput.value.trim()) {
+  elements.apiUrlInput.value = DEFAULT_API_URL;
+}
+if (elements.longitudeInput && !elements.longitudeInput.value.trim()) {
+  elements.longitudeInput.value = String(DEFAULT_LONGITUDE);
+}
+if (elements.latitudeInput && !elements.latitudeInput.value.trim()) {
+  elements.latitudeInput.value = String(DEFAULT_LATITUDE);
+}
+if (elements.distanceInput && !elements.distanceInput.value.trim()) {
+  elements.distanceInput.value = String(DEFAULT_DISTANCE_MILES);
+}
+if (elements.startDateInput && !elements.startDateInput.value.trim()) {
+  elements.startDateInput.value = "2020-01-01";
+}
+
+loadApiData();

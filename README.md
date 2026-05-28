@@ -1,8 +1,35 @@
-# Crash Query Tool
+# Crash Dashboard (Web-First)
 
-This app queries a VDOT / local crash feature layer and returns the matching crash records as GeoJSON.
+This project now runs as a browser-first crash dashboard.
 
-## Command line
+The web app can:
+
+- Run live ArcGIS crash queries directly from the browser
+- Render map markers with severity filters
+- Show summary cards, severity breakdown, and recent crash table
+- Fall back to `output.json` when needed
+
+## Web Flow (Primary)
+
+Host the dashboard locally:
+
+```bash
+python -m http.server 8000
+```
+
+Open:
+
+`http://localhost:8000/index.html`
+
+Then in the page:
+
+1. Set your ArcGIS `/query` endpoint and filters.
+2. Click **Run Live Query**.
+3. Use **Load output.json** only when you want to view static saved data.
+
+## Optional Python CLI (Data Export)
+
+If you still want to export GeoJSON from CLI, use `crash_parser.py`:
 
 Run a query against the feature layer `/query` endpoint:
 
@@ -26,22 +53,7 @@ Save the returned GeoJSON to a file:
 python crash_parser.py "https://REPLACE_WITH_ACTUAL_ENDPOINT_URL/query" --json-out crash_geojson.json
 ```
 
-## Desktop UI
-
-Launch the desktop app:
-
-```bash
-python crash_ui.py
-```
-
-In the UI you can:
-
-- Enter the query endpoint URL
-- Set longitude, latitude, start date, and radius
-- Adjust distance from the origin using a miles slider
-- Override the WHERE clause if needed
-- View the record count and query parameters
-- Save the GeoJSON response as JSON
+The desktop Tkinter UI remains in the repo for compatibility but is no longer the primary workflow.
 
 ## Unit tests
 
@@ -53,14 +65,15 @@ python -m unittest discover -s tests -v
 
 ## GitHub Pages Dashboard
 
-This repository now includes a static dashboard in `index.html` that reads `output.json` and can be hosted on GitHub Pages.
+This repository includes a static dashboard in `index.html` that can be hosted on GitHub Pages.
 
 To use it on GitHub Pages:
 
-1. Commit `index.html`, `styles.css`, `app.js`, and `output.json` to your repository.
-2. In GitHub, go to Settings > Pages.
-3. Set the source to the root of the main branch.
-4. Open the Pages URL after GitHub finishes building the site.
+1. Commit `index.html`, `styles.css`, and `app.js` to your repository.
+2. Optionally commit `output.json` if you want static fallback data.
+3. In GitHub, go to Settings > Pages.
+4. Set the source to the root of the main branch.
+5. Open the Pages URL after GitHub finishes building the site.
 
 To test locally before publishing:
 
